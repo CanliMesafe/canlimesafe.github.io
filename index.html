@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Canlı Mesafe Ölçer</title>
+  <style>
+    body { font-family: Arial; text-align: center; margin-top: 50px; }
+    button { font-size: 18px; padding: 10px 20px; }
+  </style>
+</head>
+<body>
+  <h1>Canlı Mesafe Ölçer</h1>
+  <button id="startBtn">Başla</button>
+  <h2>Mesafe: <span id="distance">--</span> metre</h2>
+
+  <!-- Firebase compat scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+  <script>
+    let myId, otherId;
+    let db;
+
+    // Haversine formula
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const toRad = x => x * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                Math.sin(dLon / 2) ** 2;
+      return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+    }
+
+    document.getElementById('startBtn').addEventListener('click', () => {
+      // Ask for ID
+      myId = prompt("ID girin: (A veya B)").toUpperCase();
+      if(myId !== "A" && myId !== "B") {
+        alert("Geçersiz ID. Lütfen yeniden yükleyin ve A ya da B girin.");
+        return;
+      }
+      otherId = myId === "A" ? "B" : "A";
+
+      // Firebase config
+      const firebaseConfig = {
+      apiKey: "AIzaSyD-fNosH2tWS0IjUSEaj6_6NwWCSaIRIBc",
+      authDomain: "gps-mesafe.firebaseapp.com",
+      databaseURL: "https://gps-mesafe-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "gps-mesafe",
+      storageBucket: "gps-mesafe.firebasestorage.app",
+      messagingSenderId: "1035888990786",
+      appId: "1:1035888990786:web:e2f8fde7b74a2b90f5abdb"
+      };
+
+      const app = firebase.initializeApp(firebaseConfig);
+      db = firebase.database();
+
+      // Watch my location
+      if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(pos => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          firebase.database().ref(myId).set({lat, lon});
+        }, err => {
+          alert("Error getting location: " + err.message);
+        }, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
+      } else {
+        alert("Geolocation is not supported by your browser");
+      }
+
+      // Listen to other phone
+      firebase.database().ref(otherId).on("value", snap => {
+        const other = snap.val();
+        firebase.database().ref(myId).once("value").then(mySnap => {
+          const me = mySnap.val();
+          if(me && other) {
+            const dist = haversine(me.lat, me.lon, other.lat, other.lon);
+            document.getElementById("distance").innerText = dist.toFixed(1);
+          }
+        });
+      });
+
+      // Hide start button after starting
+      document.getElementById('startBtn').style.display = 'none';
+    });
+  </script>
+</body>
+</html>
